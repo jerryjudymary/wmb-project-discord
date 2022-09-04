@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>My Discord OAuth2 App</title>
+</head>
+<script>
+    async function auth() {
+        if (!window.klaytn) {
+            const agent = window.navigator.userAgent.toLowerCase();
+
+            let browserName;
+
+            switch (true) {
+                case agent.indexOf("edge") > -1:
+                    browserName = "MS Edge";
+                    break;
+                case agent.indexOf("edg/") > -1:
+                    browserName = "Edge (chromium based)";
+                    break;
+                case agent.indexOf("whale") > -1:
+                    browserName = "Whale";
+                    break;
+                case agent.indexOf("samsungbrowser") > -1:
+                    browserName = "SamsungBrowser";
+                    break;
+                case agent.indexOf("opr") > -1 && !!window.opr:
+                    browserName = "Opera";
+                    break;
+                case agent.indexOf("chrome") > -1 && !!window.chrome:
+                    browserName = "Chrome";
+                    break;
+                default:
+                    browserName = 'other';
+            };
+
+            if (browserName !== 'other') {
+                alert('Kaikas가 설치되어 있지 않아 설치 페이지로 이동합니다.');
+                window.location.href = 'https://chrome.google.com/webstore/detail/kaikas/jblndlipeogpafnldhgmapagcccfchpi?hl=ko';
+            } else {
+                alert('Chrome 기반 브라우저에서만 이용이 가능합니다.');
+            };
+            return;
+        };
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get("code");
+
+        const resUser = await fetch('/api/user', {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                code
+            }),
+        });
+
+        const oauthData = await resUser.json();
+        const oauthDataJSON = JSON.parse(oauthData);
+
+        const userResult = await fetch("https://discord.com/api/users/@me", {
+            headers: {
+                authorization: `${oauthDataJSON.token_type} ${oauthDataJSON.access_token}`,
+            },
+        });
+
+        const userData = await userResult.json();
+        const userId = userData.id;
+        const userName = userData.username;
+
+        if (userId === undefined) {
+            alert('창을 닫고 다시 버튼을 눌러주세요.');
+            return;
+        };
+
+        document.getElementById("userId").innerText = userId;
+        document.getElementById("userName").innerText = userName;
+
+        let address;
+
+        try {
+            const accounts = await window.klaytn.enable();
+            address = accounts[0];
+        } catch (err) {
+            alert(err, "지갑 주소를 불러오지 못했습니다.");
+            return;
+        };
+
+        document.getElementById("walletAddress").innerText = address;
+
+        const resAuth = await fetch('/api/auth', {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                address,
+                userId,
+                userName,
+            }),
+        });
+
+        const resData = await resAuth.json();
+
+        if (resData.code === 400) {
+            document.getElementById("info").innerHTML = '<h1>이미 인증된 회원입니다.</h1>';
+            return;
+        };
+
+        if (resData.code === 200) {
+            document.getElementById("info").innerHTML = '<h1>인증되었습니다! Discord로 돌아가보세요 :)</h1>';
+            return;
+        } else {
+            alert('에러가 발생했습니다.');
+            return;
+        };
+    };
+
+    window.onload = auth().catch(err => alert(err, '에러가 발생했습니다.'));
+</script>
+
+<body>
+    <div id="userName"></div>
+    <div id="userId"></div>
+    <div id="walletAddress"></div>
+    <div id="info">Kaikas에 연결중입니다..</div>
+    <div id="console"></div>
+</body>
+
+</html>
